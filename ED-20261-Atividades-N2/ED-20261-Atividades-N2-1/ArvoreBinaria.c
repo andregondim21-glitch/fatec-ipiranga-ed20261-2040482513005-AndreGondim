@@ -1,24 +1,18 @@
 /*--------------------------------------------------*/
-/* FATEC-Ipiranga                                   */ 
+/* FATEC-Ipiranga                                   */
 /* ADS - Estrutura de Dados                         */
 /* Id da Atividade: N2-1                            */
 /* Objetivo: Explorando Árvore Binária              */
 /*                                                  */
 /* Autor: André Gondim Carlucci                     */
-/* Data: 28/04/2026                                 */
+/* Data: 01/05/2026                                 */
 /*--------------------------------------------------*/
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include "minhabib.h"
 
-/*Estrutura do nó*/
-typedef struct No {
-    int valor;
-    struct No *esq;
-    struct No *dir;
-} No;
-
-/*Criação de inserção*/
 No *criarNo(int valor) {
     No *novo = (No *)malloc(sizeof(No));
     novo->valor = valor;
@@ -36,151 +30,127 @@ No *inserir(No *raiz, int valor) {
     return raiz;
 }
 
-/* Raiz */
-void exibirRaiz(No *raiz) {
-    printf("==================================================\n");
-    printf("RAIZ:\n");
-    if (raiz != NULL)
+/* Nós Internos: possuem pelo menos um filho */
+void imprimir_nos_internos(No* raiz) {
+    if (raiz == NULL) return;
+    if (raiz->esq != NULL || raiz->dir != NULL)
         printf("  %d\n", raiz->valor);
-    else
-        printf("  (árvore vazia)\n");
+    imprimir_nos_internos(raiz->esq);
+    imprimir_nos_internos(raiz->dir);
 }
 
-/* Nós internos */
-void exibirNosInternos(No *no) {
-    if (no == NULL) return;
-    if (no->esq != NULL || no->dir != NULL)
-        printf("  %d\n", no->valor);
-    exibirNosInternos(no->esq);
-    exibirNosInternos(no->dir);
+/* Nós Externos (Folhas): sem nenhum filho */
+void imprimir_folhas(No* raiz) {
+    if (raiz == NULL) return;
+    if (raiz->esq == NULL && raiz->dir == NULL)
+        printf("  %d\n", raiz->valor);
+    imprimir_folhas(raiz->esq);
+    imprimir_folhas(raiz->dir);
 }
 
-/* Nós externos */
-void exibirFolhas(No *no) {
-    if (no == NULL) return;
-    if (no->esq == NULL && no->dir == NULL)
-        printf("  %d\n", no->valor);
-    exibirFolhas(no->esq);
-    exibirFolhas(no->dir);
+/* Calcula a altura de um nó (distância até a folha mais distante) */
+int calcular_altura(No* no) {
+    if (no == NULL) return -1;
+    int altEsq = calcular_altura(no->esq);
+    int altDir = calcular_altura(no->dir);
+    return 1 + (altEsq > altDir ? altEsq : altDir);
 }
 
-/* Níveis */
-/* Conta quantos nós existem em um nível específico */
-int contarNivel(No *no, int nivelAtual, int nivelAlvo) {
+/* Calcula a profundidade de um nó (distância até a raiz) */
+int calcular_profundidade(No* raiz, int valor, int profundidade_atual) {
+    if (raiz == NULL) return -1;
+    if (raiz->valor == valor) return profundidade_atual;
+    int esq = calcular_profundidade(raiz->esq, valor, profundidade_atual + 1);
+    if (esq != -1) return esq;
+    return calcular_profundidade(raiz->dir, valor, profundidade_atual + 1);
+}
+
+/* ---- Funções auxiliares para imprimir_niveis ---- */
+
+/* Conta nós num nível específico (nível 0 = raiz) */
+static int contar_nivel(No *no, int nivelAtual, int nivelAlvo) {
     if (no == NULL) return 0;
     if (nivelAtual == nivelAlvo) return 1;
-    return contarNivel(no->esq, nivelAtual + 1, nivelAlvo) +
-           contarNivel(no->dir, nivelAtual + 1, nivelAlvo);
+    return contar_nivel(no->esq, nivelAtual + 1, nivelAlvo) +
+           contar_nivel(no->dir, nivelAtual + 1, nivelAlvo);
 }
 
-/* Imprime os valores de todos os nós em um nível específico */
-void imprimirNosDoNivel(No *no, int nivelAtual, int nivelAlvo) {
+/* Imprime os valores de todos os nós de um nível específico */
+static void imprimir_nos_do_nivel(No *no, int nivelAtual, int nivelAlvo) {
     if (no == NULL) return;
     if (nivelAtual == nivelAlvo) {
         printf("  %d\n", no->valor);
         return;
     }
-    imprimirNosDoNivel(no->esq, nivelAtual + 1, nivelAlvo);
-    imprimirNosDoNivel(no->dir, nivelAtual + 1, nivelAlvo);
+    imprimir_nos_do_nivel(no->esq, nivelAtual + 1, nivelAlvo);
+    imprimir_nos_do_nivel(no->dir, nivelAtual + 1, nivelAlvo);
 }
 
-/* Calcula a altura da árvore (número de níveis) */
-int altura(No *no) {
-    if (no == NULL) return 0;
-    int altEsq = altura(no->esq);
-    int altDir = altura(no->dir);
-    return 1 + (altEsq > altDir ? altEsq : altDir);
-}
-
-void exibirNiveis(No *raiz) {
-    printf("==================================================\n");
-    printf("NÍVEIS:\n");
-    int totalNiveis = altura(raiz);
-    for (int nivel = 1; nivel <= 7; nivel++) {
-        printf("  Nível %d:", nivel);
-        if (nivel > totalNiveis || contarNivel(raiz, 1, nivel) == 0) {
+/*
+ * Exibe todos os níveis da árvore.
+ * nivel_atual deve ser chamado com 0 (representa a raiz = Nível 0).
+ * Exibe do Nível 0 até o Nível n (altura total da árvore).
+ */
+void imprimir_niveis(No* raiz, int nivel_atual) {
+    /* nivel_atual é usado como ponto de partida;
+       a função percorre do nível 0 até a altura máxima */
+    int totalNiveis = calcular_altura(raiz) + 1; /* +1 pois altura retorna arestas */
+    for (int nivel = nivel_atual; nivel < nivel_atual + totalNiveis; nivel++) {
+        int nivelRelativo = nivel - nivel_atual; /* nível lógico (0, 1, 2...) */
+        printf("  Nivel %d:", nivelRelativo);
+        if (contar_nivel(raiz, 0, nivelRelativo) == 0) {
             printf(" (vazio)\n");
         } else {
             printf("\n");
-            imprimirNosDoNivel(raiz, 1, nivel);
+            imprimir_nos_do_nivel(raiz, 0, nivelRelativo);
         }
     }
 }
 
-/* Grau de cada nó */
-int calcularGrau(No *no) {
-    if (no == NULL) return -1;
-    int grau = 0;
-    if (no->esq != NULL) grau++;
-    if (no->dir != NULL) grau++;
-    return grau;
-}
-
-void exibirGraus(No *no) {
-    if (no == NULL) return;
-    printf("  %d → grau %d\n", no->valor, calcularGrau(no));
-    exibirGraus(no->esq);
-    exibirGraus(no->dir);
-}
-
-/* Ancestrais*/
-/* Retorna 1 se encontrou o valor; imprime o caminho de volta (ancestrais) */
-int exibirAncestral(No *no, int valorAlvo) {
+/* Retorna 1 se encontrou o valor e imprime os ancestrais no caminho de volta */
+static int _ancestrais_rec(No *no, int valor) {
     if (no == NULL) return 0;
-    if (no->valor == valorAlvo) return 1;
-    if (exibirAncestral(no->esq, valorAlvo) ||
-        exibirAncestral(no->dir, valorAlvo)) {
+    if (no->valor == valor) return 1;
+    if (_ancestrais_rec(no->esq, valor) || _ancestrais_rec(no->dir, valor)) {
         printf("  %d\n", no->valor);
         return 1;
     }
     return 0;
 }
 
-/*Descendentes*/
-/* Primeiro localiza o nó; depois imprime toda a subárvore (exceto a raiz) */
-No *buscarNo(No *no, int valor) {
+/* Imprime os ancestrais do nó com o valor dado (do pai até a raiz) */
+void imprimir_ancestrais(No* raiz, int valor) {
+    _ancestrais_rec(raiz, valor);
+}
+
+/* Localiza um nó pelo valor */
+static No *buscar_no(No *no, int valor) {
     if (no == NULL) return NULL;
     if (no->valor == valor) return no;
-    No *resultado = buscarNo(no->esq, valor);
+    No *resultado = buscar_no(no->esq, valor);
     if (resultado != NULL) return resultado;
-    return buscarNo(no->dir, valor);
+    return buscar_no(no->dir, valor);
 }
 
-void exibirDescendentes(No *no, int imprimirRaiz) {
+/* Imprime todos os descendentes de um nó (todos os nós da subárvore, exceto ele mesmo) */
+void imprimir_descendentes(No* no) {
     if (no == NULL) return;
-    if (!imprimirRaiz) {          /* pula a própria raiz da busca */
-        exibirDescendentes(no->esq, 1);
-        exibirDescendentes(no->dir, 1);
-        return;
+    /* Imprime filhos e todos os seus descendentes */
+    if (no->esq != NULL) {
+        printf("  %d\n", no->esq->valor);
+        imprimir_descendentes(no->esq);
     }
-    printf("  %d\n", no->valor);
-    exibirDescendentes(no->esq, 1);
-    exibirDescendentes(no->dir, 1);
+    if (no->dir != NULL) {
+        printf("  %d\n", no->dir->valor);
+        imprimir_descendentes(no->dir);
+    }
 }
 
-/* Altura de um determinado nó*/
-int alturaDono(No *raiz, int valor) {
-    No *alvo = buscarNo(raiz, valor);
-    if (alvo == NULL) return -1;
-    return altura(alvo) - 1;   /* altura da subárvore - 1 */
-}
-
-/* Profundidade de um determinado nó */
-int profundidade(No *no, int valor, int nivel) {
-    if (no == NULL) return -1;
-    if (no->valor == valor) return nivel;
-    int esq = profundidade(no->esq, valor, nivel + 1);
-    if (esq != -1) return esq;
-    return profundidade(no->dir, valor, nivel + 1);
-}
-
-/* Sub-árvore */
-void exibirSubArvore(No *no, char *prefixo, int ehFilhoDir) {
+static void exibir_sub_arvore(No *no, char *prefixo, int ehFilhoDir) {
     if (no == NULL) return;
 
-    /* Imprime o prefixo acumulado + conector */
     printf("%s", prefixo);
-    if (ehFilhoDir == -1) {           /* raiz da sub-árvore */
+    if (ehFilhoDir == -1) {
         printf("%d\n", no->valor);
     } else if (ehFilhoDir) {
         printf("└── %d\n", no->valor);
@@ -188,7 +158,6 @@ void exibirSubArvore(No *no, char *prefixo, int ehFilhoDir) {
         printf("├── %d\n", no->valor);
     }
 
-    /* Monta novo prefixo para os filhos */
     char novoPrefixo[256];
     if (ehFilhoDir == -1) {
         snprintf(novoPrefixo, sizeof(novoPrefixo), "%s", prefixo);
@@ -200,13 +169,73 @@ void exibirSubArvore(No *no, char *prefixo, int ehFilhoDir) {
 
     if (no->esq != NULL || no->dir != NULL) {
         if (no->esq != NULL)
-            exibirSubArvore(no->esq, novoPrefixo, 0);
+            exibir_sub_arvore(no->esq, novoPrefixo, 0);
         if (no->dir != NULL)
-            exibirSubArvore(no->dir, novoPrefixo, 1);
+            exibir_sub_arvore(no->dir, novoPrefixo, 1);
     }
 }
 
-int main() {
+void analisar_arvore(No* raiz, int valorBusca) {
 
-    return 0;
+    printf("==================================================\n");
+    printf(" DIAGNÓSTICO GERAL DA ÁRVORE\n");
+    printf("==================================================\n");
+
+    /* Raiz */
+    printf("\nRAIZ:\n");
+    if (raiz != NULL)
+        printf("  %d\n", raiz->valor);
+    else
+        printf("  (árvore vazia)\n");
+
+    /* Nós Internos */
+    printf("\nNÓS INTERNOS (possuem ao menos um filho):\n");
+    imprimir_nos_internos(raiz);
+
+    /* Nós Externos / Folhas */
+    printf("\nNÓS EXTERNOS / FOLHAS (sem filhos):\n");
+    imprimir_folhas(raiz);
+
+    /* Níveis (Nível 0 = raiz) */
+    printf("\nNÍVEIS DA ÁRVORE:\n");
+    imprimir_niveis(raiz, 0);
+
+    printf("\n==================================================\n");
+    printf(" DIAGNÓSTICO ESPECÍFICO — Nó buscado: %d\n", valorBusca);
+    printf("==================================================\n");
+
+    No *alvo = buscar_no(raiz, valorBusca);
+    if (alvo == NULL) {
+        printf("  Nó %d não encontrado na árvore.\n", valorBusca);
+        return;
+    }
+
+    int grau = 0;
+    if (alvo->esq != NULL) grau++;
+    if (alvo->dir != NULL) grau++;
+    printf("\nGRAU DO NÓ %d:\n  %d filho(s)\n", valorBusca, grau);
+
+    printf("\nANCESTRAIS DE %d (do pai até a raiz):\n", valorBusca);
+    if (raiz->valor == valorBusca) {
+        printf("  (é a raiz — sem ancestrais)\n");
+    } else {
+        imprimir_ancestrais(raiz, valorBusca);
+    }
+
+    printf("\nDESCENDENTES DE %d:\n", valorBusca);
+    if (alvo->esq == NULL && alvo->dir == NULL) {
+        printf("  (folha — sem descendentes)\n");
+    } else {
+        imprimir_descendentes(alvo);
+    }
+
+    int alt = calcular_altura(alvo);
+    printf("\nALTURA DO NÓ %d:\n  %d\n", valorBusca, alt);
+    int prof = calcular_profundidade(raiz, valorBusca, 0);
+    printf("\nPROFUNDIDADE DO NÓ %d:\n  %d\n", valorBusca, prof);
+    printf("\n==================================================\n");
+    printf(" SUB-ÁRVORE COM RAIZ EM %d\n", valorBusca);
+    printf("==================================================\n\n");
+    exibir_sub_arvore(alvo, "", -1);
+    printf("\n");
 }
